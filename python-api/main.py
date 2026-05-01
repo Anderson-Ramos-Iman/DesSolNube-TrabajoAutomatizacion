@@ -37,6 +37,33 @@ def limpiar_nombre(nombre):
 
     return nombre.title()
 
+def normalizar_fecha(fecha_texto):
+    fecha_texto = str(fecha_texto).lower().strip()
+
+    meses = {
+        "ene": "01", "feb": "02", "mar": "03", "abr": "04",
+        "may": "05", "jun": "06", "jul": "07", "ago": "08",
+        "set": "09", "sep": "09", "oct": "10", "nov": "11", "dic": "12"
+    }
+
+    # Caso: 01/05/2026
+    match_num = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', fecha_texto)
+    if match_num:
+        dia = match_num.group(1).zfill(2)
+        mes = match_num.group(2).zfill(2)
+        anio = match_num.group(3)
+        return f"{dia}/{mes}/{anio}"
+
+    # Caso: 01 may. 2026
+    match_texto = re.search(r'(\d{1,2})\s+(ene|feb|mar|abr|may|jun|jul|ago|set|sep|oct|nov|dic)\.?\s+(\d{4})', fecha_texto)
+    if match_texto:
+        dia = match_texto.group(1).zfill(2)
+        mes = meses[match_texto.group(2)]
+        anio = match_texto.group(3)
+        return f"{dia}/{mes}/{anio}"
+
+    return fecha_texto
+
 def extraer_datos(texto):
     texto_lower = texto.lower()
 
@@ -151,6 +178,7 @@ def extraer_datos(texto):
         "valido": monto_limpio is not None,
         "texto_raw": texto
     }
+    
 
 @app.get("/")
 def inicio():
@@ -238,10 +266,11 @@ def reporte():
     cantidad = 0
 
     for row in ws.iter_rows(min_row=2, values_only=True):
-        fecha = str(row[0]).strip()
+        fecha_excel = normalizar_fecha(row[0])
         monto = row[3]
+        estado = str(row[6]).strip() if row[6] else ""
 
-        if fecha == hoy and monto:
+        if fecha_excel == hoy and monto and estado == "Registrado":
             try:
                 total += float(monto)
                 cantidad += 1
