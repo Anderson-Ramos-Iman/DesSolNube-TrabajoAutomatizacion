@@ -219,7 +219,37 @@ async def procesar_imagen(file: UploadFile = File(...)):
 
 @app.get("/reporte")
 def reporte():
+    ruta_excel = "/app/pagos/pagos.xlsx"
+
+    if not os.path.exists(ruta_excel):
+        return {
+            "fecha": datetime.now().strftime("%d/%m/%Y"),
+            "total": 0,
+            "cantidad": 0,
+            "mensaje": "No hay registros aún"
+        }
+
+    wb = load_workbook(ruta_excel)
+    ws = wb.active
+
+    hoy = datetime.now().strftime("%d/%m/%Y")
+
+    total = 0
+    cantidad = 0
+
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        fecha = str(row[0]).strip()
+        monto = row[3]
+
+        if fecha == hoy and monto:
+            try:
+                total += float(monto)
+                cantidad += 1
+            except:
+                pass
+
     return {
-        "fecha": datetime.now().strftime("%d/%m/%Y"),
-        "mensaje": "Endpoint de reporte preparado para integración posterior"
+        "fecha": hoy,
+        "total": round(total, 2),
+        "cantidad": cantidad
     }
