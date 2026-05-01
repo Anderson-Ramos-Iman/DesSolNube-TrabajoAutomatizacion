@@ -239,9 +239,6 @@ async def procesar_imagen(file: UploadFile = File(...)):
     texto = pytesseract.image_to_string(img_proc, lang="spa")
     datos = extraer_datos(texto)
 
-    if datos["valido"]:
-        datos = guardar_en_excel(datos)
-
     return datos
 
 
