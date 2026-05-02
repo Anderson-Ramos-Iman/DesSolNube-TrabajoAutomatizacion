@@ -98,9 +98,9 @@ def extraer_datos(texto):
 
     #! Buscar monto con S/ o PEN
     monto = re.search(
-        r'(?:s\s*/\s*|pen\s*)([0-9bB]+(?:[.,][0-9]{1,2})?)',
-        texto_corregido
-    )
+    r'(?:s\s*/?\s*|s\/\s*|pen\s*)([0-9]+(?:[.,][0-9]{1,2})?)',
+    texto_corregido
+)
     monto_limpio = None
 
     if monto:
@@ -173,51 +173,40 @@ def extraer_datos(texto):
         texto_lower
     )
 
-    #! Buscar nombre del destinatario o remitente cerca del monto
-    nombre = re.search(
-        r'enviado\s*a:\s*\n?\s*([a-záéíóúñ\s]+)',
-        texto_lower
-    )
-
-    # Si no encuentra (fallback Yape)
-    if not nombre:
-        nombre = re.search(
-            r'(?:s\s*/?\s*[0-9]+(?:[.,][0-9]{1,2})?)\s*\n+\s*([a-záéíóúñ\s\*]+)',
-            texto_lower
-        )
-
-    # Si no encuentra (fallback Plin)
-    if not nombre:
-        nombre = re.search(
-            r'(anderson\s+[a-záéíóúñ\s]+\*?)',
-            texto_corregido
-        )
-
-    #! Buscar nombre según formato Yape / Plin
+ #! Buscar nombre según formato Yape / Plin
     nombre = None
 
-    # PLIN: "Enviado a:"
     patrones_nombre = [
+        # PLIN: Enviado a:
         r'enviado\s*a\s*:?\s*\n?\s*([a-záéíóúñ\s]+)',
+
+        # PLIN: Enviado por:
         r'enviado\s*por\s*:?\s*\n?\s*([a-záéíóúñ\s]+)',
 
         # YAPE: nombre debajo del monto
         r'(?:s\s*/?\s*[0-9]+(?:[.,][0-9]{1,2})?)\s*\n+\s*([a-záéíóúñ\s\*]+)',
 
-        # Nombres antes de fecha
+        # YAPE: nombre antes de fecha
         r'\n\s*([a-záéíóúñ\s]+\*?)\s*\n\s*\d{1,2}\s+(?:ene|feb|mar|abr|may|jun|jul|ago|set|sep|oct|nov|dic)',
+
+        # Fallback: nombres conocidos por estructura general
+        r'([a-záéíóúñ]+\s+[a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?\*?)'
     ]
 
     for patron in patrones_nombre:
-        nombre = re.search(patron, texto_lower)
-        if nombre:
-            nombre_detectado = nombre.group(1).strip()
+        encontrado = re.search(patron, texto_lower)
+        if encontrado:
+            posible_nombre = encontrado.group(1).strip()
 
-            # Evitar que tome palabras como "enviado"
-            if nombre_detectado not in ["enviado", "enviado a", "pago exitoso", "te yapearon"]:
+            basura = [
+                "te yapearon", "yapeaste", "pago exitoso",
+                "codigo de seguridad", "datos de la transaccion",
+                "nro de celular", "destino", "yape", "plin"
+            ]
+
+            if posible_nombre.lower() not in basura and len(posible_nombre.split()) >= 2:
+                nombre = encontrado
                 break
-            else:
-                nombre = None
 
     #! Determinar tipo de pago
     tipo = "Yape" if "yape" in texto_lower else "Plin" if "plin" in texto_lower else "Desconocido"
