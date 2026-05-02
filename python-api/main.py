@@ -153,9 +153,16 @@ def extraer_datos(texto):
 
     #! Buscar nombre del destinatario o remitente cerca del monto
     nombre = re.search(
-        r'(?:s\s*/?\s*[0-9bB]+(?:[.,][0-9]{1,2})?|pen\s*[0-9]+(?:[.,][0-9]{1,2})?)\s*\n+\s*([a-záéíóúñ\s\*]+)',
-        texto_corregido
+        r'enviado\s*a:\s*\n?\s*([a-záéíóúñ\s]+)',
+        texto_lower
     )
+
+    # Si no encuentra (fallback Yape)
+    if not nombre:
+        nombre = re.search(
+            r'(?:s\s*/?\s*[0-9]+(?:[.,][0-9]{1,2})?)\s*\n+\s*([a-záéíóúñ\s\*]+)',
+            texto_lower
+        )
 
     if not nombre:
         nombre = re.search(
@@ -164,7 +171,7 @@ def extraer_datos(texto):
         )
 
     #! Determinar tipo de pago
-    tipo = "Yape" if "yape" in texto_lower else "Plin" if "plin" in texto_lower else "Lemon" if "lemon" in texto_lower else "Desconocido"
+    tipo = "Yape" if "yape" in texto_lower else "Plin" if "plin" in texto_lower else "Desconocido"
 
     return {
         "fecha": fecha.group(1) if fecha else fecha_texto.group(1) if fecha_texto else datetime.now().strftime("%d/%m/%Y"),
