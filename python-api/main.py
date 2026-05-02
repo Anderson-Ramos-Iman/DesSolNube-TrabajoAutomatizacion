@@ -15,13 +15,23 @@ def preprocesar_imagen(image_bytes):
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
     if img is None:
-        return None
+        return []
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.resize(gray, None, fx=1.5, fy=1.5)
-    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
 
-    return thresh
+    # Imagen más grande para OCR
+    gray_big = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+
+    # Varias versiones para que Tesseract tenga más oportunidad
+    _, th1 = cv2.threshold(gray_big, 150, 255, cv2.THRESH_BINARY)
+    th2 = cv2.adaptiveThreshold(
+        gray_big, 255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        31, 11
+    )
+
+    return [gray_big, th1, th2]
 
 def limpiar_nombre(nombre):
     if not nombre:
@@ -164,11 +174,38 @@ def extraer_datos(texto):
             texto_lower
         )
 
+    # Si no encuentra (fallback Plin)
     if not nombre:
         nombre = re.search(
             r'(anderson\s+[a-záéíóúñ\s]+\*?)',
             texto_corregido
         )
+
+    #! Buscar nombre según formato Yape / Plin
+    nombre = None
+
+    # PLIN: "Enviado a:"
+    patrones_nombre = [
+        r'enviado\s*a\s*:?\s*\n?\s*([a-záéíóúñ\s]+)',
+        r'enviado\s*por\s*:?\s*\n?\s*([a-záéíóúñ\s]+)',
+
+        # YAPE: nombre debajo del monto
+        r'(?:s\s*/?\s*[0-9]+(?:[.,][0-9]{1,2})?)\s*\n+\s*([a-záéíóúñ\s\*]+)',
+
+        # Nombres antes de fecha
+        r'\n\s*([a-záéíóúñ\s]+\*?)\s*\n\s*\d{1,2}\s+(?:ene|feb|mar|abr|may|jun|jul|ago|set|sep|oct|nov|dic)',
+    ]
+
+    for patron in patrones_nombre:
+        nombre = re.search(patron, texto_lower)
+        if nombre:
+            nombre_detectado = nombre.group(1).strip()
+
+            # Evitar que tome palabras como "enviado"
+            if nombre_detectado not in ["enviado", "enviado a", "pago exitoso", "te yapearon"]:
+                break
+            else:
+                nombre = None
 
     #! Determinar tipo de pago
     tipo = "Yape" if "yape" in texto_lower else "Plin" if "plin" in texto_lower else "Desconocido"
@@ -243,7 +280,12 @@ async def procesar_imagen(file: UploadFile = File(...)):
             "error": "No se pudo procesar la imagen"
         }
 
-    texto = pytesseract.image_to_string(img_proc, lang="spa")
+    textos = []
+    for img in img_proc:
+        texto_tmp = pytesseract.image_to_string(img, lang="spa")
+        textos.append(texto_tmp)
+
+    texto = "\n".join(textos)
     datos = extraer_datos(texto)
 
     return datos
