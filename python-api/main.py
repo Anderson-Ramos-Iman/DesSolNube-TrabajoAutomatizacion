@@ -20,7 +20,7 @@ def preprocesar_imagen(image_bytes):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # Imagen más grande para OCR
-    gray_big = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    gray_big = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
 
     # Varias versiones para que Tesseract tenga más oportunidad
     _, th1 = cv2.threshold(gray_big, 150, 255, cv2.THRESH_BINARY)
@@ -119,6 +119,12 @@ def extraer_datos(texto):
             monto_limpio = monto_limpio[-6:]  # ejemplo: 9113.50 -> 113.50
             if monto_limpio.startswith("1") and "13.50" in texto_corregido:
                 monto_limpio = "13.50"
+    if monto_limpio:
+        valor_monto = float(monto_limpio)
+
+    # evita errores como leer S/25 como S/2.00
+    if valor_monto < 3:
+        monto_limpio = None
 
     #! Buscar número de operación o referencia
     operacion = re.search(
@@ -218,9 +224,9 @@ def extraer_datos(texto):
         "monto": f"{float(monto_limpio):.2f}" if monto_limpio else None,
         "tipo": tipo,
         "operacion": operacion_valor,
-        "estado": "Registrado" if monto_limpio else "No válido",
+        "estado": "Registrado" if monto_limpio and operacion_valor else "No válido",
         "registrado_por": "Bot automático",
-        "valido": monto_limpio is not None,
+        "valido": monto_limpio is not None and operacion_valor is not None,
         "texto_raw": texto
     }
     
