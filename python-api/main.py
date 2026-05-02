@@ -39,10 +39,22 @@ def limpiar_nombre(nombre):
 
     nombre = nombre.replace("*", "")
     nombre = nombre.replace("\\n", " ")
-    nombre = re.sub(r"[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]", "", nombre)
+    nombre = re.sub(r"[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]", " ", nombre)
     nombre = re.sub(r"\s+", " ", nombre).strip()
 
-    # Elimina letras sueltas al final, ejemplo: "Anderson Ram A" → "Anderson Ram"
+    palabras_basura = [
+        "enviado", "enviado a", "enviado por",
+        "pago exitoso", "te yapearon", "yapeaste",
+        "codigo de seguridad", "datos de la transaccion"
+    ]
+
+    nombre_lower = nombre.lower().strip()
+
+    for basura in palabras_basura:
+        if nombre_lower == basura:
+            return "No detectado"
+
+    # Elimina letra suelta al final
     nombre = re.sub(r"\s+[A-ZÁÉÍÓÚÑ]$", "", nombre, flags=re.IGNORECASE)
 
     return nombre.title()
