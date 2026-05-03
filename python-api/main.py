@@ -122,6 +122,7 @@ def extraer_datos(texto):
     if monto_limpio:
         valor_monto = float(monto_limpio)
 
+
     # evita errores como leer S/25 como S/2.00
     if valor_monto < 3:
         monto_limpio = None
@@ -217,16 +218,22 @@ def extraer_datos(texto):
     #! Determinar tipo de pago
     tipo = "Yape" if "yape" in texto_lower else "Plin" if "plin" in texto_lower else "Desconocido"
 
+
+    try:
+        monto_final = f"{float(monto_limpio):.2f}" if monto_limpio else None
+    except:
+        monto_final = None
+
     return {
         "fecha": fecha.group(1) if fecha else fecha_texto.group(1) if fecha_texto else datetime.now().strftime("%d/%m/%Y"),
         "hora": hora_final if hora_final else datetime.now().strftime("%H:%M:%S"),
         "nombre": limpiar_nombre(nombre.group(1)) if nombre else "No detectado",
-        "monto": f"{float(monto_limpio):.2f}" if monto_limpio else None,
+        "monto": monto_final,
         "tipo": tipo,
         "operacion": operacion_valor,
-        "estado": "Registrado" if monto_limpio and operacion_valor else "No válido",
+        "estado": "Registrado" if monto_final and operacion_valor else "No válido",
         "registrado_por": "Bot automático",
-        "valido": monto_limpio is not None and operacion_valor is not None,
+        "valido": monto_final is not None and operacion_valor is not None,
         "texto_raw": texto
     }
     
@@ -278,24 +285,50 @@ def guardar_en_excel(datos):
 
 @app.post("/procesar-imagen")
 async def procesar_imagen(file: UploadFile = File(...)):
-    contenido = await file.read()
-    img_proc = preprocesar_imagen(contenido)
+    try:
+        contenido = await file.read()
+        img_proc = preprocesar_imagen(contenido)
 
-    if img_proc is None:
+        if not img_proc:
+            return {
+                "fecha": datetime.now().strftime("%d/%m/%Y"),
+                "hora": datetime.now().strftime("%H:%M:%S"),
+                "nombre": "No detectado",
+                "monto": None,
+                "tipo": "Desconocido",
+                "operacion": None,
+                "estado": "No válido",
+                "registrado_por": "Bot automático",
+                "valido": False,
+                "texto_raw": "",
+                "error": "No se pudo procesar la imagen"
+            }
+
+        textos = []
+
+        for img in img_proc:
+            texto_tmp = pytesseract.image_to_string(img, lang="spa")
+            textos.append(texto_tmp)
+
+        texto = "\n".join(textos)
+        datos = extraer_datos(texto)
+
+        return datos
+
+    except Exception as e:
         return {
+            "fecha": datetime.now().strftime("%d/%m/%Y"),
+            "hora": datetime.now().strftime("%H:%M:%S"),
+            "nombre": "No detectado",
+            "monto": None,
+            "tipo": "Desconocido",
+            "operacion": None,
+            "estado": "No válido",
+            "registrado_por": "Bot automático",
             "valido": False,
-            "error": "No se pudo procesar la imagen"
+            "texto_raw": "",
+            "error": str(e)
         }
-
-    textos = []
-    for img in img_proc:
-        texto_tmp = pytesseract.image_to_string(img, lang="spa")
-        textos.append(texto_tmp)
-
-    texto = "\n".join(textos)
-    datos = extraer_datos(texto)
-
-    return datos
 
 
 @app.get("/reporte")
